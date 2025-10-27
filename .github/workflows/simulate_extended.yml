@@ -1,0 +1,24 @@
+name: Quantum Simulation Extended
+
+on: [push]
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install qiskit qiskit-aer matplotlib numpy
+      - name: Run POLER Quantum Simulation (Mode A)
+        run: python POLER_sim.py
+      - name: Run POLER Quantum Simulation (Mode B)
+        run: python POLER_modeB.py
+      - name: Run POLER Quantum Simulation (Mode C)
+        run: python POLER_modeC.py
+      - name: Run POLER Psi Field Integration
+        run: python POLER_Psi_v3.py
