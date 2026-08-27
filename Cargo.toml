@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "poler-dynamis",
+    "poler-eri",
+    "poler-sctp"
+]
+resolver = "2"
