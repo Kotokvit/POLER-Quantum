@@ -3,6 +3,9 @@
     poler-quantum demo        -- the classical cognitive cycle (with a
                                  constrained-tracking showcase of Pi_Lambda)
     poler-quantum quantum     -- the quantum-sampled engine + Born stats
+    poler-quantum compress    -- dynamic continuous quantization (RQ2):
+                                 phase compression, adaptive eps-depth,
+                                 McWeeny projector repair
     poler-quantum benchmark   -- full benchmark: POLER vs baselines,
                                  figures + metrics.json in ./results/
     poler-quantum spec        -- print the POLER[n] pipeline
@@ -17,8 +20,13 @@ import numpy as np
 
 from . import __version__
 from .core.engine import PolerConfig, PolerEngine
+from .core.purification import (idempotency_error, mcweeny_purify,
+                                 projector_from_constraints, quantize_entries,
+                                 subspace_error)
 from .quantum.engine import QuantumConfig, QuantumPolerEngine
 from .quantum.ansatz import PolerAnsatz
+from .quantum.compression import (AdaptiveDepth, effective_bits,
+                                  phase_quantization_error, phase_quantize)
 from .benchmark.tasks import tracking_task
 from .benchmark.runners import (run_all, run_multiseed, summarise,
                                 format_table, format_aggregate_table,
@@ -166,6 +174,86 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_compress(args: argparse.Namespace) -> int:
+    """Dynamic continuous quantization demo (RQ2, v1.1.0)."""
+    rng = np.random.default_rng(args.seed)
+
+    # -- 1. phase compression of a state vector --------------------------------
+    print("=" * 72)
+    print("1. PHASE COMPRESSION  theta = arccos(p), grid on [0, pi]")
+    print("=" * 72)
+    p = np.clip(rng.standard_normal(8) * 0.6, -0.99, 0.99)
+    print(f"state dim 8, seed {args.seed}; error bound pi/(levels-1)\n")
+    print(f"{'levels':>7} {'bits':>6} {'max err':>10} {'rmse':>10}")
+    for levels in (2, 3, 5, 17, 257):
+        max_err, rmse = phase_quantization_error(p, levels)
+        note = {2: "sign bit", 3: "trits {+1,0,-1}"}.get(levels, "")
+        print(f"{levels:>7} {effective_bits(levels):>6.2f} "
+              f"{max_err:>10.2e} {rmse:>10.2e}  {note}")
+
+    # -- 2. McWeeny repair of a quantized projector ----------------------------
+    print()
+    print("=" * 72)
+    print("2. McWEENY REPAIR  P_new = 3P^2 - 2P^3  (rank-4 projector, dim 6)")
+    print("=" * 72)
+    Pi = projector_from_constraints(rng.standard_normal((2, 6)))
+    print(f"{'grid':>7} {'bits':>6} {'||Q^2-Q||':>11} {'after 2 it':>11} "
+          f"{'iters->1e-12':>13} {'rank':>5} {'sub drift':>10}")
+    for levels in (257, 65, 17, 5):
+        Q = quantize_entries(Pi, levels)
+        e0 = idempotency_error(Q)
+        r2 = mcweeny_purify(Q, max_iters=2)
+        rfull = mcweeny_purify(Q, max_iters=30, tol=1e-12)
+        rank = int(round(np.trace(rfull.matrix)))
+        print(f"{levels:>7} {effective_bits(levels):>6.2f} {e0:>11.2e} "
+              f"{idempotency_error(r2.matrix):>11.2e} "
+              f"{rfull.iterations:>13d} {rank:>5d} "
+              f"{subspace_error(rfull.matrix, Pi):>10.2e}")
+    print("\nthe invariant (P^2 = P) is restored exactly; the subspace\n"
+          "drifts by ~ the corruption size -- repair, not identity.")
+
+    # -- 3. adaptive eps-depth in the engine -------------------------------------
+    print()
+    print("=" * 72)
+    print("3. ADAPTIVE eps-DEPTH IN THE QUANTUM ENGINE (trits -> 8 bits)")
+    print("=" * 72)
+    task = tracking_task(T=120, dim=6, seed=args.seed)
+    obs = np.tanh(task.observations)
+
+    full = QuantumPolerEngine(QuantumConfig(dim=6, seed=args.seed,
+                                             q_seed=args.qseed))
+    full.reset()
+    traj_full = full.run(obs).states
+
+    comp = QuantumPolerEngine(QuantumConfig(dim=6, seed=args.seed,
+                                             q_seed=args.qseed,
+                                             adaptive_depth=True,
+                                             levels_min=3, levels_max=256))
+    comp.reset()
+    report = comp.run(obs)
+    traj_comp = report.states
+
+    def rmse(traj):
+        return float(np.sqrt(np.mean((traj[20:] - task.target[20:]) ** 2)))
+    bits = np.array([s.eff_bits for s in report.steps])
+    lv = np.array([s.levels for s in report.steps])
+    eps_hat = np.array([s.eps_hat for s in report.steps])
+    print(f"RMSE full precision : {rmse(traj_full):.4f}")
+    print(f"RMSE compressed     : {rmse(traj_comp):.4f}")
+    print(f"mean depth          : {bits.mean():.2f} bits "
+          f"(min {bits.min():.2f}, max {bits.max():.2f}, "
+          f"grid sizes {lv.min()}..{lv.max()})\n")
+    print("depth around the regime switches (eps-spike unfolds the space):")
+    print(f"{'t':>4} {'eps_hat':>9} {'levels':>7} {'bits':>6}")
+    switch = int(task.spec.switches[0]) if len(task.spec.switches) else 60
+    for t in range(max(0, switch - 3), min(len(eps_hat), switch + 4)):
+        print(f"{t:>4} {eps_hat[t]:>9.3f} {lv[t]:>7d} {bits[t]:>6.2f}")
+    print("\nbackground perception runs on trits; a spike of significance "
+          "unfolds\nthe full phase space within one step -- dynamic in "
+          "time, not static.")
+    return 0
+
+
 def cmd_spec(_: argparse.Namespace) -> int:
     print(PIPELINE.strip())
     return 0
@@ -198,6 +286,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--qseed", type=int, default=42)
     p.add_argument("--outdir", default="results")
     p.set_defaults(func=cmd_benchmark)
+
+    p = sub.add_parser("compress", help="dynamic continuous quantization "
+                                       "(phase grids, McWeeny, eps-depth)")
+    p.add_argument("--seed", type=int, default=7)
+    p.add_argument("--qseed", type=int, default=42)
+    p.set_defaults(func=cmd_compress)
 
     p = sub.add_parser("spec", help="print the POLER[n] pipeline")
     p.set_defaults(func=cmd_spec)

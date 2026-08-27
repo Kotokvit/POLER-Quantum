@@ -39,6 +39,7 @@ jobs:
         run: |
           poler-quantum demo
           poler-quantum quantum
+          poler-quantum compress
           poler-quantum spec
       - name: Benchmark (3 seeds)
         run: poler-quantum benchmark --T 200 --dim 6 --seeds 3 --outdir results

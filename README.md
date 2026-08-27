@@ -21,7 +21,7 @@ This repository is the complete, tested reference implementation:
 * `poler_quantum.core` — the classical engine (numpy)
 * `poler_quantum.quantum` — the quantum-sampled engine (Qiskit Aer)
 * `poler_quantum.benchmark` — reproducible benchmarks with figures
-* 72 unit / integration tests, deterministic under fixed seeds
+* 128 unit / integration tests, deterministic under fixed seeds
 
 ---
 
@@ -78,11 +78,43 @@ streamed **fully from the internet** (zero-storage archives, poler-engine).
 Full concept: [`docs/dynamic-quantization.md`](docs/dynamic-quantization.md);
 plan: [`docs/rust-core-roadmap.md`](docs/rust-core-roadmap.md).
 
+## Shipped in v1.1.0 (RQ2): McWeeny + adaptive ε-depth
+
+The first half of the vision now runs in the Python reference core:
+
+* `poler_quantum.core.purification` — McWeeny purification `3P² − 2P³`:
+  entry-grid quantization of a projector breaks `P² = P`; the repair
+  restores the invariant **quadratically** (8-bit grid: `6.3e-3 → 9.4e-9`
+  in two iterations; eigenvalues return to {0, 1}; rank survives).
+  Honest limits are tested too: the subspace drifts by ~the corruption
+  size (repair, not identity), and corruption crossing the spectral gap
+  can rotate the subspace — see the module docstring.
+* `poler_quantum.quantum.compression` — **phase quantization**
+  (`θ = arccos p`, grid on `[0, π]`): 2 levels = sign bit, 3 = trits
+  `{+1, 0, −1}`, `2^b` = b-bit phase grid; error bounded by `π/(levels−1)`.
+* `AdaptiveDepth` — the ε→depth policy: background perception runs on
+  trits, an ε-spike unfolds the full phase space within one step.
+  Wired into `QuantumPolerEngine` (`adaptive_depth=True`,
+  `purify_projector=True`; both off by default — v1.0.0 behaviour
+  is bit-exact preserved).
+
+Measured (`poler-quantum compress`, tracking task dim 6, T 120):
+
+| engine | RMSE | mean depth |
+|:--|--:|--:|
+| full precision | 0.0740 | 64 bit float |
+| **ε-adaptive phase compression** | **0.0739** | **2.23 bit** |
+
+Around the regime switch (t = 40, ε̂ = 3.41) the grid jumps from 6 to 256
+levels in a single step and falls back to trits right after — dynamic in
+time, not static. McWeeny repair table and phase-grid error curves: run
+`poler-quantum compress`.
+
 ## Install
 
 ```bash
 pip install -r requirements.txt        # or: pip install -e .
-pytest                                  # 72 tests
+pytest                                  # 128 tests
 ```
 
 Requires Python ≥ 3.10. Quantum parts need `qiskit` + `qiskit-aer`
@@ -162,10 +194,11 @@ poler_quantum/            the package
   core/                   Ω, F, ε, R[n], Π_Λ, S(p), engine
   quantum/                ansatz (modes A/B/C) + quantum engine
   benchmark/              task generator, runners, plots
-tests/                    72 tests (pytest)
+tests/                    128 tests (pytest)
 examples/                 runnable demos
 docs/                     the completed spec, the original 2024 draft,
                           dynamic-quantization.md, rust-core-roadmap.md
+CHANGELOG.md              release history
 legacy/                   original scripts (POLER_modeB/C, Ψ_v3, ...)
 archive/                  2025 multi-language restoration fragments
 ```
@@ -176,10 +209,12 @@ archive/                  2025 multi-language restoration fragments
       tests, CI, docs.
 * [ ] **RQ1** `poler-quantum-rs`: phase encoder + statevector + Born
       sampling in pure Rust, zero quantum dependencies (parity vs Aer).
-* [ ] **RQ2** McWeeny purification `3P² − 2P³` (idempotency after
-      compression, Grassmann manifold, no retraining).
-* [ ] **RQ3** ε-adaptive bit depth: 1–2 qubits for background, full
-      `J = A − Aᵀ` phase space on ε-spikes.
+* [x] **RQ2** McWeeny purification `3P² − 2P³` + ε-adaptive phase depth —
+      **shipped in Python v1.1.0** (`core.purification`,
+      `quantum.compression`); Rust port rides with RQ1.
+* [ ] **RQ3** ε-adaptive depth by *topology*: per-coordinate / per-module
+      grids and generator-level (not entry-level) matrix compression of
+      `J = A − Aᵀ`, `D`, `Π_Λ` (state-vector phase depth shipped in v1.1.0).
 * [ ] **RQ4** Rust ↔ Python/qiskit cross-validation (< 1e-12 on small n);
       qiskit demoted to a math-development tool.
 * [ ] **RQ5** training loop: Born + Python (gym interface over the Rust core).

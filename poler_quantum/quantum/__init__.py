@@ -6,6 +6,10 @@ distribution on a Qiskit Aer simulator.
 """
 
 from .ansatz import PolerAnsatz  # noqa: F401
+from .compression import (AdaptiveDepth, phase_quantize, phase_grid,  # noqa: F401
+                          phase_quantization_error, effective_bits)
 from .engine import QuantumPolerEngine, QuantumConfig  # noqa: F401
 
-__all__ = ["PolerAnsatz", "QuantumPolerEngine", "QuantumConfig"]
+__all__ = ["PolerAnsatz", "QuantumPolerEngine", "QuantumConfig",
+           "AdaptiveDepth", "phase_quantize", "phase_grid",
+           "phase_quantization_error", "effective_bits"]

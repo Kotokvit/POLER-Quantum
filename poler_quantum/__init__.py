@@ -13,10 +13,10 @@ This package provides:
 * ``poler_quantum.quantum`` -- a quantum-sampled engine on top of Qiskit/Aer
 * ``poler_quantum.benchmark``-- reproducible tracking benchmarks and plots
 
-Version: 1.0.0
+Version: 1.1.0
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 from .core.engine import PolerEngine, PolerConfig, StepResult  # noqa: F401
 from .quantum.engine import QuantumPolerEngine, QuantumConfig  # noqa: F401
