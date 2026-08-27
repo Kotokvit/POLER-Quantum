@@ -51,6 +51,33 @@ An agent lives in a non-stationary world and maintains an internal state
 
 Full spec: [`docs/POLER_Attention_Core.md`](docs/POLER_Attention_Core.md).
 
+## Vision: dynamic continuous quantization (v2.x line)
+
+POLER-Quantum is not just a simulator — it is a **universal topological
+compressor**. Instead of static grids (AWQ / GPTQ / SmoothQuant cut weights
+onto fixed INT4/INT8/FP4 scales and break the phase structure of
+non-transformer architectures — RWKV, Mamba, SNN, BitNet, optical chips),
+it quantizes **continuously and dynamically**:
+
+* **Phase encoding** — `θ = arccos(p)`, `|ψ⟩ = cos(θ/2)|0⟩ + sin(θ/2)|1⟩`;
+  Born sampling gives `P(|0⟩) = (1+p)/2` exactly, with no rounding noise.
+* **ε-adaptive bit depth** — background tokens compress to 1–2 qubits
+  (trits), while an ε-spike unfolds the full `J = A − Aᵀ` phase space.
+  Depth is dynamic in time and topology, not fixed over the weight grid.
+* **McWeeny purification** — `P_new = 3P² − 2P³` restores idempotency of a
+  quantized projector onto the Grassmann manifold in 1–2 iterations,
+  without retraining.
+* **Substrate independence** — the same invariants `HΨ = 0` and operators
+  `(D, J, Π_Λ)` map onto Mach-Zehnder phase shifters, memristive crossbars
+  (`D = LLᵀ`) and multiplier-less FPGA shift-and-add (`R_t = ε_t + ρR_{t−1}`).
+
+**Architecture decision (owner, 2026-08-27):** the production simulator is
+pure **Rust** — qiskit and friends are tools for *developing the math*, not
+runtime dependencies. Training runs **Born + Python when needed**, on data
+streamed **fully from the internet** (zero-storage archives, poler-engine).
+Full concept: [`docs/dynamic-quantization.md`](docs/dynamic-quantization.md);
+plan: [`docs/rust-core-roadmap.md`](docs/rust-core-roadmap.md).
+
 ## Install
 
 ```bash
@@ -137,7 +164,8 @@ poler_quantum/            the package
   benchmark/              task generator, runners, plots
 tests/                    72 tests (pytest)
 examples/                 runnable demos
-docs/                     the completed spec + the original 2024 draft
+docs/                     the completed spec, the original 2024 draft,
+                          dynamic-quantization.md, rust-core-roadmap.md
 legacy/                   original scripts (POLER_modeB/C, Ψ_v3, ...)
 archive/                  2025 multi-language restoration fragments
 ```
@@ -146,6 +174,17 @@ archive/                  2025 multi-language restoration fragments
 
 * [x] v1.0.0 — complete classical core, quantum-sampled engine, benchmark,
       tests, CI, docs.
+* [ ] **RQ1** `poler-quantum-rs`: phase encoder + statevector + Born
+      sampling in pure Rust, zero quantum dependencies (parity vs Aer).
+* [ ] **RQ2** McWeeny purification `3P² − 2P³` (idempotency after
+      compression, Grassmann manifold, no retraining).
+* [ ] **RQ3** ε-adaptive bit depth: 1–2 qubits for background, full
+      `J = A − Aᵀ` phase space on ε-spikes.
+* [ ] **RQ4** Rust ↔ Python/qiskit cross-validation (< 1e-12 on small n);
+      qiskit demoted to a math-development tool.
+* [ ] **RQ5** training loop: Born + Python (gym interface over the Rust core).
+* [ ] **RQ6** training data fully from the internet: zero-storage streaming
+      archives (poler-engine integration).
 * [ ] richer worlds: control tasks (act on the world, not only perceive),
   multi-agent resonance coupling.
 * [ ] hardware ansatz (mode B/C on real backends via Qiskit Runtime).
