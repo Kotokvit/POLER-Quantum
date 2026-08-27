@@ -47,9 +47,10 @@ Rust-ядро стартует не с нуля: операторная база
 
 ## 4. Milestones
 
-* **RQ1 — `poler-quantum-rs`: фазовый энкодер + statevector.**
+* **RQ1 — `poler-quantum-rs`: фазовый энкодер + statevector. ✅ ЯДРО ГОТОВО (2026-08-28, POLER-Quantum-RS v0.1.1).**
   Чистый Rust-крейт: `Ry(arccos p_i)`-энкодинг, entanglement-цепь (CX/CZ), statevector-симулятор, Born sampling с детерминированными сидами. Ноль внешних квант-зависимостей. Паритет с `quantum/ansatz.py` по распределениям (χ²-тест на фиксированных сидах).
-  **Старт положен (2026-08-27):** репозиторий [POLER-Quantum-RS](https://github.com/Kotokvit/POLER-Quantum-RS) создан — крейт `pqw` v0.1.0 (контейнер `.poler`/`.pqw`, zero-dependency, mmap zero-copy, 66 тестов + 2 doc-теста). faer/SIMD-ядро — следующий слой поверх этого контейнера.
+  **Старт положен (2026-08-27):** репозиторий [POLER-Quantum-RS](https://github.com/Kotokvit/POLER-Quantum-RS) создан — крейт `pqw` v0.1.0 (контейнер `.poler`/`.pqw`, zero-dependency, mmap zero-copy, 66 тестов + 2 doc-теста).
+  **Ядро (2026-08-28):** крейт `pqc` v0.1.1 — statevector до 2²⁶ амплитуд с гейтами Ry/Rx/Rz, H, X/Y/Z, CNOT, CZ; анзац `⊗ Ry(arccos p)`; Born-сэмплирование инверсией CDF; LENS-продуктовый движок для любых d_pol (фон — честные монеты popcount-трюком, спайки — Бернулли); мост из `.pqw` с McWeeny-заострением; xoshiro256++; CLI `pqc run/demo` — автономный бинарник без Python/Qiskit. faer/SIMD-класс без зависимости faer: авто-векторизуемые блочные ядра + детерминированный fork-join на std::thread. Паритет с аналитикой 1e-12, 157 тестов. Замеры (2 vCPU): анзац 2²⁰ — 16 мс, 100k выстрелов — 13 мс, product d=65536 — 45 мс. Остаётся χ²-кросс-тест против `quantum/ansatz.py` (RQ4).
 * **RQ2 — McWeeny purification. ✅ ВЫПОЛНЕН в Python (v1.1.0, 2026-08-27).**
   `P_new = 3P² − 2P³` в `poler_quantum/core/purification.py`: квадратичная сходимость (8-битная сетка: 6.3e-3 → 9.4e-9 за 2 итерации), сохранение ранга, честные ограничения (дрейф подпространства ~ коррупция). Адаптивная ε-глубина — `quantum/compression.py`: фон на тритах, спайк разворачивает сетку до 256 уровней за один шаг; измерено RMSE 0.0739 (2.23 бита) vs 0.0740 (полная точность). Rust-порт уезжает вместе с RQ1.
 * **RQ3 — ε-adaptive bit-depth.**
@@ -72,11 +73,15 @@ Rust-ядро стартует не с нуля: операторная база
 
 Формат стабилен с RQ1, версионируется. Любой узел POLER Mesh (exec, engine) может исполнить состояние без переквантования.
 
-> **Статус (2026-08-27):** первый слой контейнера реализован — крейт [`pqw` v0.1.0](https://github.com/Kotokvit/POLER-Quantum-RS)
+> **Статус (2026-08-28):** первый слой контейнера реализован — крейт [`pqw` v0.1.0](https://github.com/Kotokvit/POLER-Quantum-RS)
 > (репозиторий POLER-Quantum-RS): zero-dependency формат `.poler`/`.pqw` — фазовые триты `{−1, 0, +1}` + 6-битная
 > кривизна, sparse LENS-топология (u16/u32), mmap zero-copy, целостность SHA-256/FNV-1a, McWeeny-инвариант
 > `P² = P` в заголовке. Байто-точная спецификация: `docs/pqw-format.md` того репозитория. Поля режима анзаца,
 > такта `t`, `R_t` и `J = A − Aᵀ` — план v2 поверх стабильного заголовка v1.
+>
+> **Исполнитель (2026-08-28):** крейт `pqc` v0.1.1 оживляет контейнер: `Ansatz::from_reader` (zero-copy) —
+> деквантование `p̂ = trit·σ/63` → `θ̂ = arccos(p̂)` → `R_y(θ̂)` → Born sampling. Тождество:
+> `P(b=1) = (1−p)/2`, McWeeny-собственное значение `λ = (1+p)/2 = P(b=0)`. Спецификация: `docs/quantum-core.md`.
 
 ## 6. Источник
 
