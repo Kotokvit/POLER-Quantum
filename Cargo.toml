@@ -1,5 +1,7 @@
 [workspace]
 members = [
+    "poler-core",
+    "poler-lens",
     "poler-dynamis",
     "poler-eri",
     "poler-sctp"
