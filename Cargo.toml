@@ -4,6 +4,8 @@ members = [
     "poler-lens",
     "poler-dynamis",
     "poler-eri",
-    "poler-sctp"
+    "poler-sctp",
+    "poler-bridge",
+    "litgraph/litgraph-core"
 ]
 resolver = "2"
